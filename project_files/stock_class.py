@@ -1,6 +1,6 @@
 # Summary: This module contains the class definitions that will be used in the stock analysis program
-# Author: 
-# Date: 
+# Author: Joseph Brisendine
+# Date: 03/03/24
 
 from datetime import datetime
 
