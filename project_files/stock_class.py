@@ -33,6 +33,12 @@ class Stock:
     def shares(self):
         return self._shares
 
+    @shares.setter
+    def shares(self, value):
+        if value < 0:
+            raise ValueError("Shares cannot be negative.")
+        self._shares = value
+
     def buy(self, amount):
         if amount < 0:
             raise ValueError("Buy amount cannot be negative.")
@@ -50,7 +56,7 @@ class Stock:
         if daily_data.close < 0 or daily_data.volume < 0:
             raise ValueError("Negative values not allowed for close or volume.")
         self.DataList.append(daily_data)
-    
+
 # Create DailyData class here.
 class DailyData:
     def __init__(self, date, close, volume):
