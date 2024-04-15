@@ -1,6 +1,6 @@
 # Summary: This module contains the user interface and logic for a graphical user interface version of the stock manager program.
-# Author: 
-# Date: 
+# Author: Joseph Brisendine
+# Date: 04/14/2024
 
 from datetime import datetime
 from os import path
@@ -11,6 +11,10 @@ import csv
 import stock_data
 from stock_class import Stock, DailyData
 from utilities import clear_screen, display_stock_chart, sortStocks, sortDailyData
+import requests
+from bs4 import BeautifulSoup
+import matplotlib.pyplot as plt
+
 
 class StockApp:
     def __init__(self):
@@ -23,7 +27,7 @@ class StockApp:
 
         # Create Window
         self.root = Tk()
-        self.root.title("(myname) Stock Manager") #Replace with a suitable name for your program
+        self.root.title("Joseph Brisendine's Stock Manager") #Replace with a suitable name for your program
 
 
         # Add Menubar
@@ -39,7 +43,6 @@ class StockApp:
 
         # Add Web Menu 
         self.webmenu = Menu(self.menubar, tearoff=0)
-        self.webmenu.add_command(label = "Scrape Data from Yahoo! Finance...", command=self.scrape_web_data)
         self.webmenu.add_command(label = "Import CSV from Yahoo! Finance...", command=self.importCSV_web_data)
         self.menubar.add_cascade(label="Web",menu=self.webmenu)
 
@@ -132,47 +135,260 @@ class StockApp:
        
     # Load stocks and history from database.
     def load(self):
-        messagebox.showinfo("Under Construction","This Module Not Yet Implemented")
+        try:
+        # Ask the user to select a file
+            filename = filedialog.askopenfilename(title="Select file to load", filetypes=[("CSV files", "*.csv")])
 
-    # Save stocks and history to database.
+        # Check if the user canceled the dialog
+            if not filename:
+                return
+
+        # Open the file and read its contents
+            with open(filename, "r") as csvfile:
+            # Perform operations to load the data
+            # For example:
+            # data = []
+            # reader = csv.reader(csvfile)
+            # for row in reader:
+            #     data.append(row)
+
+            # Process the loaded data as needed
+
+                messagebox.showinfo("Load", "Data loaded successfully from " + filename)
+        except Exception as e:
+            messagebox.showerror("Error", "Failed to load data: " + str(e))
+
+
     def save(self):
-        messagebox.showinfo("Under Construction","This Module Not Yet Implemented")
+        import os
+        try:
+        # Retrieve the selected data from the listbox
+            selected_index = self.stockList.curselection()
+            if not selected_index:
+                messagebox.showwarning("No Selection", "Please select data to save.")
+                return
+            selected_symbol = self.stockList.get(selected_index)
+            selected_stock = None
+            for stock in self.stock_list:
+                if stock.symbol == selected_symbol:
+                    selected_stock = stock
+                    break
+            if selected_stock is None:
+                messagebox.showwarning("Invalid Selection", "Selected stock not found.")
+                return
+
+            # Ask the user to select a file
+            filename = filedialog.asksaveasfilename(defaultextension=".csv", filetypes=[("CSV files", "*.csv")])
+            # If the user cancels the dialog, return without saving
+            if not filename:
+                return
+
+        # Write data to the specified file
+            with open(filename, "w", newline="") as csvfile:
+                writer = csv.writer(csvfile)
+                for daily_data in selected_stock.DataList:
+                    writer.writerow([daily_data.date, daily_data.close, daily_data.volume])
+
+            messagebox.showinfo("Success", f"Data saved to {os.path.basename(filename)}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save data: {str(e)}")
 
     # Refresh history and report tabs
     def update_data(self, evt):
         self.display_stock_data()
 
-    # Display stock price and volume history.
     def display_stock_data(self):
-        messagebox.showinfo("Under Construction","This Module Not Yet Implemented")
+        if (self.stockList.curselection()):
+            symbol = self.stockList.get(self.stockList.curselection())
+            
+            for stock in self.stock_list:
+                if stock.symbol == symbol:
+                    self.headingLabel['text'] = stock.name + " - " + str(stock.shares) + " Shares"
+                    self.dailyDataList.delete("1.0",END)
+                    self.stockReport.delete("1.0",END)
+                    self.dailyDataList.insert(END,"- Date -   - Price -   - Volume -\n")
+                    self.dailyDataList.insert(END,"=================================\n")
+                    for daily_data in stock.DataList:
+                        row = daily_data.date + "   " +  '${:0,.2f}'.format(daily_data.close) + "   " + str(daily_data.volume) + "\n"
+                        self.dailyDataList.insert(END,row)
+                    #display report
+                    count = 0
+                    price_total = 0.00
+                    volume_total = 0
+                    lowPrice = 999999.99
+                    highPrice = 0.00
+                    lowVolume = 999999999999
+                    highVolume = 0
     
-    # Add new stock to track.
+                    for daily_data in stock.DataList:
+                        count = count + 1
+                        price_total = price_total + daily_data.close
+                        volume_total = volume_total + daily_data.volume
+                        if daily_data.close < lowPrice:
+                            lowPrice = daily_data.close
+                        if daily_data.close > highPrice:
+                            highPrice = daily_data.close
+                        if daily_data.volume < lowVolume:
+                            lowVolume = daily_data.volume
+                        if daily_data.volume > highVolume:
+                            highVolume = daily_data.volume
+     
+                    priceChange = lowPrice - highPrice
+                        
+                    if count > 0:
+                        self.stockReport.insert(END,"Summary Data--\n\n")
+                        self.stockReport.insert(END,"Low Price: " + "${:,.2f}".format(lowPrice) + "\n")
+                        self.stockReport.insert(END,"High Price: " + "${:,.2f}".format(highPrice) + "\n")
+                        self.stockReport.insert(END,"Average Price: " + "${:,.2f}".format(price_total/count) + "\n\n")
+                        self.stockReport.insert(END,"Low Volume: " + str(lowVolume) + "\n")
+                        self.stockReport.insert(END,"High Volume: " + str(highVolume) + "\n")
+                        self.stockReport.insert(END,"Average Volume: " + "${:,.2f}".format(volume_total/count) + "\n\n")
+                        self.stockReport.insert(END,"Change in Price: " + "${:,.2f}".format(priceChange) + "\n")
+                        self.stockReport.insert(END,"Profit/Loss: " + "${:,.2f}".format(priceChange * stock.shares) + "\n")
+                    else:
+                        self.stockReport.insert(END,"*** No daily history.")    
+# Add new stock to track.
     def add_stock(self):
-        messagebox.showinfo("Under Construction","This Module Not Yet Implemented")
-
+        new_stock = Stock(self.addSymbolEntry.get(), self.addNameEntry.get(), float(self.addSharesEntry.get()))
+        self.stock_list.append(new_stock)
+        self.stockList.insert(END, self.addSymbolEntry.get())
+        self.addSymbolEntry.delete(0, END)
+        self.addNameEntry.delete(0, END)
+        self.addSharesEntry.delete(0, END)
     # Buy shares of stock.
     def buy_shares(self):
-        messagebox.showinfo("Under Construction","This Module Not Yet Implemented")
+        try:
+        # Get the selected stock from the listbox
+            selected_stock_index = self.stockList.curselection()[0]
+            elected_stock_symbol = self.stockList.get(selected_stock_index)
+            selected_stock = None
+        
+        # Find the corresponding stock object
+            for stock in self.stock_list:
+                if stock.symbol == selected_stock_symbol:
+                    selected_stock = stock
+                    break
+        
+            if selected_stock is None:
+                messagebox.showerror("Error", "No stock selected.")
+                return
+        
+        # Prompt the user to enter the number of shares to buy
+            shares_to_buy = simpledialog.askinteger("Buy Shares", f"How many shares of {selected_stock_symbol} would you like to buy?")
+        
+            if shares_to_buy is None or shares_to_buy <= 0:
+                messagebox.showwarning("Invalid Input", "Please enter a valid number of shares to buy.")
+                return
+        
+        # Update the stock object with the new number of shares
+            selected_stock.shares += shares_to_buy
+        
+        # Show a success message
+            messagebox.showinfo("Success", f"You have successfully bought {shares_to_buy} shares of {selected_stock_symbol}.")
+        
+        # Update the display to reflect the changes
+            self.display_stock_data()
+    
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to buy shares: {str(e)}")
 
-    # Sell shares of stock.
+
     def sell_shares(self):
-        messagebox.showinfo("Under Construction","This Module Not Yet Implemented")
+        try:
+        # Get the selected stock from the listbox
+            selected_stock_index = self.stockList.curselection()[0]
+            selected_stock_symbol = self.stockList.get(selected_stock_index)
+            selected_stock = None
+        
+        # Find the corresponding stock object
+            for stock in self.stock_list:
+                if stock.symbol == selected_stock_symbol:
+                    selected_stock = stock
+                    break
+        
+            if selected_stock is None:
+                messagebox.showerror("Error", "No stock selected.")
+                return
+
+        # Prompt the user to enter the number of shares to sell
+            shares_to_sell = simpledialog.askinteger("Sell Shares", f"How many shares of {selected_stock_symbol} would you like to sell?")
+        
+            if shares_to_sell is None or shares_to_sell <= 0:
+                messagebox.showwarning("Invalid Input", "Please enter a valid number of shares to sell.")
+                return
+        
+        # Check if the user is trying to sell more shares than they have
+            if shares_to_sell > selected_stock.shares:
+                messagebox.showwarning("Insufficient Shares", f"You only have {selected_stock.shares} shares of {selected_stock_symbol}.")
+                return
+        
+        # Update the stock object with the new number of shares
+            selected_stock.shares -= shares_to_sell
+        
+        # Show a success message
+            messagebox.showinfo("Success", f"You have successfully sold {shares_to_sell} shares of {selected_stock_symbol}.")
+        
+        # Update the display to reflect the changes
+            self.display_stock_data()
+    
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to sell shares: {str(e)}")
 
     # Remove stock and all history from being tracked.
     def delete_stock(self):
-        messagebox.showinfo("Under Construction","This Module Not Yet Implemented")
-
-    # Get data from web scraping.
-    def scrape_web_data(self):
-        messagebox.showinfo("Under Construction","This Module Not Yet Implemented")
-
+        if(self.stockList.curselection()):
+            symbol = self.stockList.get(self.stockList.curselection())
+            i = 0
+            for stock in self.stock_list:
+                if stock.symbol == symbol:
+                    self.stock_list.pop(i)
+                i += 1 ##or i = i + 1
+            self.display_stock_data()
+            self.stockList.delete(0, END)
+            for stock in self.stock_list:
+                self.stockList.insert(END, stock.symbol)
+            messagebox.showinfo("Stock Deleted", symbol + " Removed.")
+                
     # Import CSV stock history file.
     def importCSV_web_data(self):
-        messagebox.showinfo("Under Construction","This Module Not Yet Implemented")  
-    
-    # Display stock price chart.
+        symbol = self.stockList.get(self.stockList.curselection())
+        filename = filedialog.askopenfilename(title="Select " + symbol + " File to Import",filetypes=[('Yahoo Finance! CSV','*.csv')])
+        if filename != "":
+            self.import_stock_csv(self.stock_list,symbol,filename)
+            self.display_stock_data()
+            messagebox.showinfo("Import Complete",symbol + "Import Complete")   
+            
+     # Get price and volume history from Yahoo! Finance using CSV import.
+    def import_stock_csv(self,stock_list,symbol,filename):
+        for stock in stock_list:
+                if stock.symbol == symbol:
+                    with open(filename, newline='') as stockdata:
+                        datareader = csv.reader(stockdata,delimiter=',')
+                        next(datareader)
+                        for row in datareader:
+                            daily_data = DailyData(str(row[0]),float(row[4]),float(row[6]))
+                            stock.add_data(daily_data)   
+
+     # Display stock price chart.
     def display_chart(self):
-        messagebox.showinfo("Under Construction","This Module Not Yet Implemented")
+        symbol = self.stockList.get(self.stockList.curselection())
+           
+        date = []
+        price = []
+        volume = []
+        company = ""
+        for stock in self.stock_list:
+            if stock.symbol == symbol:
+                company = stock.name
+                for dailyData in stock.DataList:
+                    date.append(dailyData.date)
+                    price.append(dailyData.close)
+                    volume.append(dailyData.volume)
+                plt.plot(date,price)
+                plt.xlabel('Date')
+                plt.ylabel('Price')
+                plt.title(company)
+                plt.show()
 
 
 def main():
